@@ -42,6 +42,7 @@ from .composable_node_container import ComposableNodeContainer
 
 from ..descriptions import ComposableNode
 from ..ros_adapters import get_ros_node
+from ..ros_adapters import get_ros_adapter
 from ..utilities import add_node_name
 from ..utilities import evaluate_parameters
 from ..utilities import get_node_name_count
@@ -87,6 +88,8 @@ class LoadComposableNodes(Action):
         self.__target_container = target_container
         self.__final_target_container_name = None  # type: Optional[Text]
         self.__logger = launch.logging.get_logger(__name__)
+        self.adapter = None
+        self.node = None
 
     @classmethod
     def parse(cls, entity: Entity, parser: Parser):
@@ -116,7 +119,33 @@ class LoadComposableNodes(Action):
         :param request: service request to load a node
         :param context: current launch context
         """
+        count = 0
+        destroyed_client = False
+        destroyed_adapter = False
         while not self.__rclpy_load_node_client.wait_for_service(timeout_sec=1.0):
+            print("Waiting for service")
+            if count > 5 and not destroyed_client:
+                print("Destroying client")
+                self.node.destroy_client(self.__rclpy_load_node_client)
+                print("Creating client again")
+                self.__rclpy_load_node_client = self.node.create_client(
+                    composition_interfaces.srv.LoadNode, '{}/_container/load_node'.format(
+                        self.__final_target_container_name
+                    )
+                )
+                destroyed_client = True
+            if count > 10 and not destroyed_adapter:
+                print("Recreating Adapter")
+                self.adapter.shutdown()
+                self.adapter = get_ros_adapter(context)
+                self.node = self.adapter.ros_node
+                self.__rclpy_load_node_client = self.node.create_client(
+                    composition_interfaces.srv.LoadNode, '{}/_container/load_node'.format(
+                        self.__final_target_container_name
+                    )
+                )
+                destroyed_adapter = True
+
             if context.is_shutdown:
                 self.__logger.warning(
                     "Abandoning wait for the '{}' service, due to shutdown.".format(
@@ -124,6 +153,7 @@ class LoadComposableNodes(Action):
                     )
                 )
                 return
+            count += 1
 
         # Asynchronously wait on service call so that we can periodically check for shutdown
         event = threading.Event()
@@ -221,8 +251,9 @@ class LoadComposableNodes(Action):
             return
 
         # Create a client to load nodes in the target container.
-        node = get_ros_node(context)
-        self.__rclpy_load_node_client = node.create_client(
+        self.adapter = get_ros_adapter(context)
+        self.node = self.adapter.ros_node
+        self.__rclpy_load_node_client = self.node.create_client(
             composition_interfaces.srv.LoadNode, '{}/_container/load_node'.format(
                 self.__final_target_container_name
             )

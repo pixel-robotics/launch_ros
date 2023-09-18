@@ -117,12 +117,13 @@ def get_ros_adapter(context: launch.LaunchContext):
     This function is reentrant but concurrent calls on the
     same `context` are not safe.
     """
-    if not hasattr(context.locals, 'ros_adapter'):
-        ros_adapter = ROSAdapter()
-        context.extend_globals({'ros_adapter': ros_adapter})
-        context.register_event_handler(launch.event_handlers.OnShutdown(
-            on_shutdown=lambda *args, **kwargs: ros_adapter.shutdown()
-        ))
+    # if not hasattr(context.locals, 'ros_adapter'):
+    print("CREATING ADAPTER")
+    ros_adapter = ROSAdapter()
+    context.extend_globals({'ros_adapter': ros_adapter})
+    context.register_event_handler(launch.event_handlers.OnShutdown(
+        on_shutdown=lambda *args, **kwargs: ros_adapter.shutdown()
+    ))
     return context.locals.ros_adapter
 
 
