@@ -221,11 +221,16 @@ class LoadComposableNodes(Action):
             return
 
         # Create a client to load nodes in the target container.
-        self.__rclpy_load_node_client = get_ros_node(context).create_client(
+        node = get_ros_node(context)
+        self.__rclpy_load_node_client = node.create_client(
             composition_interfaces.srv.LoadNode, '{}/_container/load_node'.format(
                 self.__final_target_container_name
             )
         )
+        print(node.get_fully_qualified_node_names())
+        print("Is ready?")
+        print(self.__rclpy_load_node_client.wait_for_service(timeout_sec=1.0))
+
 
         # Generate load requests before execute() exits to avoid race with context changing
         # due to scope change (e.g. if loading nodes from within a GroupAction).

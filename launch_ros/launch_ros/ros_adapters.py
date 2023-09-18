@@ -53,6 +53,7 @@ class ROSAdapter:
 
     def start(self):
         """Start ROS adapter."""
+        print("ADAPTER STARTING")
         if self.__is_running:
             raise RuntimeError('Cannot start a ROS adapter that is already running')
         self.__ros_context = rclpy.Context()
@@ -70,6 +71,7 @@ class ROSAdapter:
     def _run(self):
         try:
             self.__ros_executor.add_node(self.__ros_node)
+            print("Node added in executor")
             while self.__is_running:
                 # TODO(wjwwood): switch this to `spin()` when it considers
                 #   asynchronously added subscriptions.
