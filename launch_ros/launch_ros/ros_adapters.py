@@ -59,7 +59,7 @@ class ROSAdapter:
         self.__ros_context = rclpy.Context()
         rclpy.init(args=self.__argv, context=self.__ros_context)
         self.__ros_node = rclpy.create_node(
-            'launch_ros_{}'.format(os.getpid()),
+            'ros_adapter_node_{}'.format(os.getpid()),
             context=self.__ros_context
         )
         self.__ros_executor = SingleThreadedExecutor(context=self.__ros_context)
