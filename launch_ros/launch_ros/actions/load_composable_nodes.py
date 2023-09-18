@@ -227,7 +227,6 @@ class LoadComposableNodes(Action):
                 self.__final_target_container_name
             )
         )
-        print(node.get_fully_qualified_node_names())
         print("Is ready?")
         print(self.__rclpy_load_node_client.wait_for_service(timeout_sec=1.0))
 
