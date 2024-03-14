@@ -43,6 +43,7 @@ class ROSAdapter:
         """
         # Do not use `None` here, as `rclpy.init` will use `sys.argv` in that case.
         self.__argv = [] if argv is None else argv
+        self.__argv.extend(["--ros-args", "--disable-external-lib-logs"])
         self.__ros_context = None
         self.__ros_node = None
         self.__ros_executor = None
