@@ -203,6 +203,10 @@ class Node(ExecuteProcess):
         else:
             cmd = [executable]
         cmd += [] if arguments is None else arguments
+        if ros_arguments is not None:
+            ros_arguments.append('--disable-external-lib-logs')
+        else: 
+            ros_arguments = ['--disable-external-lib-logs']
         cmd += [] if ros_arguments is None else ['--ros-args'] + ros_arguments
         # Reserve space for ros specific arguments.
         # The substitutions will get expanded when the action is executed.
