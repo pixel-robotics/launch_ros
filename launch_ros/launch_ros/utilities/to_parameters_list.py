@@ -81,13 +81,10 @@ def to_parameters_list(
     :returns: a list of parameters
     """
     parameters = []  # type: List[rclpy.parameter.Parameter]
-
-    if node_name[0] != '/':
-        node_name = '/' + node_name
-
+    node_name = node_name.lstrip('/')
     if namespace and namespace != '/':
         namespace = namespace.strip('/')
-        node_name = f'/{namespace}{node_name}'
+        node_name = f'{namespace}/{node_name}'
 
     params_set = {}
     warned_once = False
