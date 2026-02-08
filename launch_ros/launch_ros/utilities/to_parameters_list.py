@@ -57,6 +57,12 @@ def __normalize_parameters_dict(dictionary):
     return normalize_parameters_dict(dictionary, [], {})
 
 
+def is_node_name_matched(node_name: str, node_fqn: str) -> bool:
+    # Will match ["/*" -> "(/\\w+)" and "/**" -> "(/\\w+)*"]
+    regex = node_name.replace('/*', '(/\\w+)')
+    return bool(re.fullmatch(regex, node_fqn))
+
+
 def to_parameters_list(
     context: LaunchContext,
     node_name: str,
@@ -93,18 +99,11 @@ def to_parameters_list(
 
                 if normalized_param_dict:
                     param_dict.clear()
-
-                    for key, value in normalized_param_dict.items():
-                        pattern = key if key[0] == '/' else '/' + key
-                        pattern = pattern.replace('/*', '(/\\w+)')
-                        try:
-                            match = re.fullmatch(pattern, node_name)
-                            if match:
-                                param_dict.update(value)
-                        except re.error as e:
-                            raise RuntimeError(
-                              'invalid yaml file {}, error: {}'.format(str(params_set_or_path), e))
-
+                    for key in normalized_param_dict:
+                        if (is_node_name_matched(f'/{key}', f'/{node_name}')):
+                            param_dict.update(normalized_param_dict[key])
+                    if node_name in normalized_param_dict:
+                        param_dict.update(normalized_param_dict[node_name])
                     if not warned_once and not node_name:
                         warnings.warn(
                             'node name not provided to launch; parameter files will not apply',

@@ -2,6 +2,31 @@
 Changelog for package launch_testing_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.26.11 (2026-01-12)
+--------------------
+* `WaitForTopics`: let the user inject a callaback to be executed after starting the subscribers (backport `#356 <https://github.com/ros2/launch_ros/issues/356>`_) (`#504 <https://github.com/ros2/launch_ros/issues/504>`_)
+* Contributors: mergify[bot]
+
+0.26.10 (2025-11-07)
+--------------------
+
+0.26.9 (2025-09-15)
+-------------------
+* fix setuptools deprecations (`#475 <https://github.com/ros2/launch_ros/issues/475>`_) (`#485 <https://github.com/ros2/launch_ros/issues/485>`_)
+* Contributors: mergify[bot]
+
+0.26.8 (2025-06-23)
+-------------------
+
+0.26.7 (2025-04-02)
+-------------------
+* Merge pull request `#447 <https://github.com/ros2/launch_ros/issues/447>`_ from ros2/mergify/bp/jazzy/pr-446
+  Fix function params indentation (backport `#446 <https://github.com/ros2/launch_ros/issues/446>`_)
+* Fix function params indentation (`#446 <https://github.com/ros2/launch_ros/issues/446>`_)
+  And add return type.
+  (cherry picked from commit aeff3ca28cfe51c522b04592ec3c7e7077bf2531)
+* Contributors: Alejandro Hernández Cordero, Christophe Bedard
+
 0.26.6 (2024-12-18)
 -------------------
 

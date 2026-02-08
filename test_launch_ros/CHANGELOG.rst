@@ -2,6 +2,32 @@
 Changelog for package test_launch_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.26.11 (2026-01-12)
+--------------------
+
+0.26.10 (2025-11-07)
+--------------------
+* Make FindPackage substitutions a Path to get operator / (`#494 <https://github.com/ros2/launch_ros/issues/494>`_) (`#497 <https://github.com/ros2/launch_ros/issues/497>`_)
+* Contributors: mergify[bot]
+
+0.26.9 (2025-09-15)
+-------------------
+* Fix SetUseSimTime for launch frontends (`#488 <https://github.com/ros2/launch_ros/issues/488>`_) (`#490 <https://github.com/ros2/launch_ros/issues/490>`_)
+* fix setuptools deprecations (`#475 <https://github.com/ros2/launch_ros/issues/475>`_) (`#485 <https://github.com/ros2/launch_ros/issues/485>`_)
+* Contributors: mergify[bot]
+
+0.26.8 (2025-06-23)
+-------------------
+* Fix: LoadComposableNodes fails to parse wildcard param files correctly (`#460 <https://github.com/ros2/launch_ros/issues/460>`_) (`#465 <https://github.com/ros2/launch_ros/issues/465>`_) (`#467 <https://github.com/ros2/launch_ros/issues/467>`_)
+* Contributors: mergify[bot]
+
+0.26.7 (2025-04-02)
+-------------------
+* Autostarting lifecycle nodes and example launch file demo (`#430 <https://github.com/ros2/launch_ros/issues/430>`_) (`#438 <https://github.com/ros2/launch_ros/issues/438>`_)
+  (cherry picked from commit 3569f0d76c68884ca8796c0134bad29e8732d868)
+  Co-authored-by: Steve Macenski <stevenmacenski@gmail.com>
+* Contributors: mergify[bot]
+
 0.26.6 (2024-12-18)
 -------------------
 * Fix url in setup.py (`#413 <https://github.com/ros2/launch_ros/issues/413>`_) (`#414 <https://github.com/ros2/launch_ros/issues/414>`_)
