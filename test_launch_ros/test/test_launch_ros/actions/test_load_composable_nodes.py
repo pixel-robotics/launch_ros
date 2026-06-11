@@ -662,3 +662,93 @@ def test_load_node_with_condition_in_group(mock_component_container):
     assert len(request.remap_rules) == 0
     assert len(request.parameters) == 0
     assert len(request.extra_arguments) == 0
+
+
+class HangingComponentContainer(MockComponentContainer):
+    """Mock container whose load_node service accepts requests but never responds.
+
+    Reproduces a component whose constructor hangs inside the container: the
+    load_node response future never resolves and everything queued behind it
+    would wait forever.
+    """
+
+    def __init__(self):
+        self._release = threading.Event()
+        super().__init__()
+
+    def load_node_callback(self, request, response):
+        self.requests.append(request)
+        self._release.wait()
+        response.success = False
+        response.error_message = 'released after test'
+        return response
+
+    def shutdown(self):
+        self._release.set()
+        super().shutdown()
+
+
+def _run_launch_service_expect_self_shutdown(actions, watchdog_timeout_s=30.0):
+    """Run a launch service, expecting it to shut itself down via the load timeout.
+
+    A watchdog forcibly stops the service after `watchdog_timeout_s` so a broken
+    timeout can't hang the test suite; the watchdog firing fails the test.
+    """
+    ld = LaunchDescription(actions)
+    ls = LaunchService()
+    ls.include_launch_description(ld)
+
+    watchdog_fired = threading.Event()
+
+    def watchdog():
+        watchdog_fired.set()
+        ls.shutdown()
+
+    timer = threading.Timer(watchdog_timeout_s, watchdog)
+    timer.daemon = True
+    timer.start()
+    try:
+        ls.run()
+    finally:
+        timer.cancel()
+    assert not watchdog_fired.is_set(), \
+        'launch service did not shut down on its own; load_node timeout did not fire'
+
+
+def test_load_node_timeout_on_hung_container():
+    """A load request that never gets a response must time out and shut launch down."""
+    container = HangingComponentContainer()
+    try:
+        _run_launch_service_expect_self_shutdown([
+            LoadComposableNodes(
+                target_container=f'/{TEST_CONTAINER_NAME}',
+                load_node_timeout=2.0,
+                composable_node_descriptions=[
+                    ComposableNode(
+                        package='foo_package',
+                        plugin='bar_plugin',
+                        name='hung_node',
+                    )
+                ],
+            )
+        ])
+        assert len(container.requests) == 1
+    finally:
+        container.shutdown()
+
+
+def test_load_node_timeout_on_missing_container():
+    """A load request whose container service never appears must time out as well."""
+    _run_launch_service_expect_self_shutdown([
+        LoadComposableNodes(
+            target_container='/nonexistent_component_container',
+            load_node_timeout=2.0,
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='foo_package',
+                    plugin='bar_plugin',
+                    name='never_loaded_node',
+                )
+            ],
+        )
+    ])

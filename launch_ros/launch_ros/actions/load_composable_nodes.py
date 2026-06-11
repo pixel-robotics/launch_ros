@@ -16,6 +16,7 @@
 
 from pathlib import Path
 import threading
+import time
 
 from typing import List
 from typing import Optional
@@ -25,6 +26,7 @@ from typing import Union
 import composition_interfaces.srv
 
 from launch.action import Action
+from launch.events import Shutdown
 from launch.frontend import Entity
 from launch.frontend import expose_action
 from launch.frontend import Parser
@@ -63,6 +65,7 @@ class LoadComposableNodes(Action):
         *,
         composable_node_descriptions: List[ComposableNode],
         target_container: Union[SomeSubstitutionsType, ComposableNodeContainer],
+        load_node_timeout: Optional[float] = 60.0,
         **kwargs,
     ) -> None:
         """
@@ -77,6 +80,12 @@ class LoadComposableNodes(Action):
 
         :param composable_node_descriptions: descriptions of composable nodes to be loaded
         :param target_container: the container to load the nodes into
+        :param load_node_timeout: maximum time in seconds to wait per node for the container's
+            load service to become available and respond. A component whose constructor hangs
+            (or a hung container) otherwise blocks the load queue forever and silently leaves
+            all queued components unloaded. On timeout an error is logged and a Shutdown event
+            is emitted so a supervisor can restart the stack. Pass None to wait indefinitely
+            (the previous behavior).
         """
         ensure_argument_type(
             target_container,
@@ -88,6 +97,7 @@ class LoadComposableNodes(Action):
         super().__init__(**kwargs)
         self.__composable_node_descriptions = composable_node_descriptions
         self.__target_container = target_container
+        self.__load_node_timeout = load_node_timeout
         self.__final_target_container_name: Optional[Text] = None
         self.__logger = launch.logging.get_logger(__name__)
 
@@ -119,6 +129,15 @@ class LoadComposableNodes(Action):
         :param request: service request to load a node
         :param context: current launch context
         """
+        deadline = (
+            time.monotonic() + self.__load_node_timeout
+            if self.__load_node_timeout is not None
+            else None
+        )
+
+        def timed_out() -> bool:
+            return deadline is not None and time.monotonic() >= deadline
+
         while not self.__rclpy_load_node_client.wait_for_service(timeout_sec=1.0):
             if context.is_shutdown:
                 self.__logger.warning(
@@ -126,6 +145,9 @@ class LoadComposableNodes(Action):
                         self.__rclpy_load_node_client.srv_name
                     )
                 )
+                return
+            if timed_out():
+                self._handle_load_timeout(request, context, 'service to become available')
                 return
 
         # Asynchronously wait on service call so that we can periodically check for shutdown
@@ -151,6 +173,10 @@ class LoadComposableNodes(Action):
                         self.__rclpy_load_node_client.srv_name),
                 )
                 response_future.cancel()
+                return
+            if timed_out():
+                response_future.cancel()
+                self._handle_load_timeout(request, context, 'load service response')
                 return
 
         # Get response
@@ -183,6 +209,34 @@ class LoadComposableNodes(Action):
                     response.error_message
                 )
             )
+
+    def _handle_load_timeout(
+        self,
+        request: composition_interfaces.srv.LoadNode.Request,
+        context: LaunchContext,
+        waited_for: Text
+    ) -> None:
+        """
+        Handle a load request that did not complete within the configured timeout.
+
+        A hung component constructor blocks the container's load queue, so every node
+        queued behind it would silently never be loaded. Log loudly and emit a Shutdown
+        event so a supervisor (e.g. systemd/docker restart policy) can restart the stack.
+        """
+        reason = (
+            "Timed out after {:.0f}s waiting for {} while loading node '{}' (plugin '{}') "
+            "in container '{}'. The container is likely hung; nodes queued behind this "
+            "request will never be loaded. Shutting down.".format(
+                self.__load_node_timeout, waited_for, request.node_name,
+                request.plugin_name, self.__final_target_container_name
+            )
+        )
+        self.__logger.error(reason)
+        # This runs in an asyncio executor thread; hand the event over to the loop thread
+        # instead of touching the (non-thread-safe) event queue directly.
+        context.asyncio_loop.call_soon_threadsafe(
+            context.emit_event_sync, Shutdown(reason=reason)
+        )
 
     def _load_in_sequence(
         self,
