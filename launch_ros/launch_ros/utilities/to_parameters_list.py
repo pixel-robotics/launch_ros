@@ -14,9 +14,14 @@
 
 """Module with utility to transform evaluated parameters into parameter lists."""
 
+import copy
+import os
 import pathlib
 import re
+from typing import Any
+from typing import Dict
 from typing import List
+from typing import Tuple
 import warnings
 
 from launch.launch_context import LaunchContext
@@ -28,6 +33,32 @@ from .evaluate_parameters import evaluate_parameter_dict
 from .normalize_parameters import normalize_parameter_dict
 
 from ..parameters_type import EvaluatedParameters
+
+
+# libyaml-backed where available: ~6-9x faster than the pure-Python SafeLoader for the
+# same result (rcl parses parameter files with libyaml as well)
+_YAML_SAFE_LOADER = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
+
+# path -> ((mtime_ns, size, inode), parsed file)
+_parameter_file_cache: Dict[str, Tuple[Tuple[int, int, int], Any]] = {}
+
+
+def _load_parameter_file(path: str) -> Any:
+    """
+    Return the parsed parameter file, parsed once while the file is unchanged.
+
+    A launch with many composable nodes passes the same (often large) parameter files
+    to each of them; they used to be parsed again for every node. The file is parsed
+    again once its mtime, size or inode changed. Every call returns its own copy.
+    """
+    stat = os.stat(path)
+    signature = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
+    cached = _parameter_file_cache.get(path)
+    if cached is None or cached[0] != signature:
+        with open(path, 'rb') as f:
+            cached = (signature, yaml.load(f, Loader=_YAML_SAFE_LOADER))
+        _parameter_file_cache[path] = cached
+    return copy.deepcopy(cached[1])
 
 
 def __normalize_parameters_dict(dictionary):
@@ -90,28 +121,27 @@ def to_parameters_list(
     warned_once = False
     for params_set_or_path in evaluated_parameters:
         if isinstance(params_set_or_path, pathlib.Path):
-            with open(str(params_set_or_path), 'r') as f:
-                param_dict = yaml.safe_load(f)
-                normalized_param_dict = __normalize_parameters_dict(param_dict)
+            param_dict = _load_parameter_file(str(params_set_or_path))
+            normalized_param_dict = __normalize_parameters_dict(param_dict)
 
-                if normalized_param_dict:
-                    param_dict.clear()
-                    for key in normalized_param_dict:
-                        if (is_node_name_matched(f'/{key}', f'/{node_name}')):
-                            param_dict.update(normalized_param_dict[key])
-                    if node_name in normalized_param_dict:
-                        param_dict.update(normalized_param_dict[node_name])
-                    if not warned_once and not node_name:
-                        warnings.warn(
-                            'node name not provided to launch; parameter files will not apply',
-                            UserWarning
-                        )
-                        warned_once = True
-
-                if param_dict:
-                    params_set = evaluate_parameter_dict(
-                        context, normalize_parameter_dict(param_dict)
+            if normalized_param_dict:
+                param_dict.clear()
+                for key in normalized_param_dict:
+                    if (is_node_name_matched(f'/{key}', f'/{node_name}')):
+                        param_dict.update(normalized_param_dict[key])
+                if node_name in normalized_param_dict:
+                    param_dict.update(normalized_param_dict[node_name])
+                if not warned_once and not node_name:
+                    warnings.warn(
+                        'node name not provided to launch; parameter files will not apply',
+                        UserWarning
                     )
+                    warned_once = True
+
+            if param_dict:
+                params_set = evaluate_parameter_dict(
+                    context, normalize_parameter_dict(param_dict)
+                )
         else:
             params_set = params_set_or_path
         if not isinstance(params_set, dict):
